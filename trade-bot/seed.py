@@ -1,30 +1,49 @@
+import json
+import time
+from statistics import mean
 from bittrex.bittrex import Bittrex
 from twisted.internet import task, reactor
 import pymongo
-import json
+
 
 with open('secrets.json', 'r') as f:
-    config = json.load(f)
+    CONFIG = json.load(f)
 
-API_KEY = config['DEFAULT']['API_KEY']
-API_SECRET = config['DEFAULT']['API_SECRET']
-URI = config['DEFAULT']['URI']
+API_KEY = CONFIG['DEFAULT']['API_KEY']
+API_SECRET = CONFIG['DEFAULT']['API_SECRET']
+URI = CONFIG['DEFAULT']['URI']
 
-my_bittrex = Bittrex(API_KEY, API_SECRET)
-
-client = pymongo.MongoClient(URI) # connect to MLab MongoDB
-db = client.ogi
-market_summaries = db.market_summaries
+MY_BITTREX = Bittrex(API_KEY, API_SECRET)
+CLIENT = pymongo.MongoClient(URI) # connect to MLab MongoDB
+MARKET_SUMMARIES = CLIENT.ogi.market_summaries
+MARKET_AVERAGES = CLIENT.ogi.market_averages
 
 # Get market summaries every 10 seconds and send to MLab
-timeout = 10.0 # ten seconds
+TIMEOUT = 10.0 # ten seconds
+
+MARKET = "BTC-ETH" # market to trade on
+
+def cal_mean_averages(market):
+    results = MARKET_SUMMARIES.find().sort('_id', pymongo.DESCENDING).limit(89)
+    last_89_ticks = []
+
+    for result in results:
+        for r in result['result']:
+            if r['MarketName'] == market:
+                last_89_ticks.append(float(r['Last']))
+    
+    x = mean(last_89_ticks[:21])
+    y = mean(last_89_ticks[:50])
+    z = mean(last_89_ticks)
+
+    MARKET_AVERAGES.insert_one({'_id': time.time(), 'x': x, 'y': y, 'z': z})
 
 def seed_market_summaries():
-    seed = my_bittrex.get_market_summaries()
-    market_summaries.insert_one({'result': seed['result']}).inserted_id
-    pass
+    seed = MY_BITTREX.get_market_summaries()
+    MARKET_SUMMARIES.insert_one({'_id': time.time(), 'result': seed['result']})
+    cal_mean_averages(MARKET)
 
-l = task.LoopingCall(seed_market_summaries)
-l.start(timeout) # call every ten seconds
+TASK = task.LoopingCall(seed_market_summaries)
+TASK.start(TIMEOUT) # call every ten seconds
 
 reactor.run()
