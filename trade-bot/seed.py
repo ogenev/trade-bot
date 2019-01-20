@@ -11,12 +11,12 @@ with open('secrets.json', 'r') as f:
 
 API_KEY = CONFIG['DEFAULT']['API_KEY']
 API_SECRET = CONFIG['DEFAULT']['API_SECRET']
-URI = CONFIG['DEFAULT']['URI']
 
 MY_BITTREX = Bittrex(API_KEY, API_SECRET)
-CLIENT = pymongo.MongoClient(URI) # connect to MLab MongoDB
-MARKET_SUMMARIES = CLIENT.ogi.market_summaries
-MARKET_AVERAGES = CLIENT.ogi.market_averages
+CLIENT = pymongo.MongoClient()
+DB = CLIENT.trade
+MARKET_SUMMARIES = DB.market_summaries
+MARKET_AVERAGES = DB.market_averages
 
 # Get market summaries every 10 seconds and send to MLab
 TIMEOUT = 10.0 # ten seconds
